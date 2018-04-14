@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 from __future__ import absolute_import
@@ -77,8 +78,9 @@ class UNet(object):
                 #encode_layers["e%d" % layer] = enc
                 return dec
             images1=lrelu(images)
-            images2=batch_norm(images1,is_training,scope="images2")
-            e11 = conv2d(images2, self.generator_dim, scope="gaussion_e1")
+
+            images2 = conv2d(images1, self.generator_dim, scope="gaussion_e1")
+            e11 = batch_norm(images2, is_training, scope="images2")
             e1=tf.concat([e11,encoding_layers["e1"]],3)
             e2 = encode_layer(e1, self.generator_dim * 2, 2,enc_layer=encoding_layers["e2"])
             e3 = encode_layer(e2, self.generator_dim * 4, 3,enc_layer=encoding_layers["e3"])
@@ -93,8 +95,8 @@ class UNet(object):
             e9 = tf.reshape(e8, [-1, nodes])
             # print(e8.get_shape())
             gaussian_params = fc(e9, self.latent_dim * 2, stddev=0.02, scope="gaussion_fc")
-            gaussian_params_act=lrelu(gaussian_params)
-            return gaussian_params_act
+            #gaussian_params_act=lrelu(gaussian_params)
+            return gaussian_params
 
 
 
@@ -110,8 +112,9 @@ class UNet(object):
                 #encode_layers["e%d" % layer] = enc
                 return dec
             images1=lrelu(images)
-            images2=batch_norm(images1,is_training,scope="images222")
-            e11 = conv2d(images2, self.generator_dim, scope="gaussion22_e1")
+
+            images2 = conv2d(images1, self.generator_dim, scope="gaussion22_e1")
+            e11 = batch_norm(images2, is_training, scope="images222")
             e1=tf.concat([e11,encoding_layers["e1"]],3)
             e2 = encode_layer(e1, self.generator_dim * 2, 2,enc_layer=encoding_layers["e2"])
             e3 = encode_layer(e2, self.generator_dim * 4, 3,enc_layer=encoding_layers["e3"])
@@ -126,8 +129,8 @@ class UNet(object):
             e9 = tf.reshape(e8, [-1, nodes])
             # print(e8.get_shape())
             gaussian_params = fc(e9, self.latent_dim * 2, stddev=0.02, scope="gaussion22_fc")
-            gaussian_params_act=lrelu(gaussian_params)
-            return gaussian_params_act
+            #gaussian_params_act=lrelu(gaussian_params)
+            return gaussian_params
 
 
     def gaussion_encoder3(self, images, is_training, reuse=False):
@@ -373,7 +376,7 @@ class UNet(object):
         #real_category_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=target_gaussian1_fake,
         #                                                                            labels=target_gaussian1))
 
-        real_category_loss=tf.reduce_sum(tf.abs(target_gaussian1_fake - target_gaussian1))
+        real_category_loss=tf.reduce_sum(tf.abs(target_gaussian1_fake[:, :self.latent_dim] - target_gaussian1_shuffle[:, :self.latent_dim]))
         #fake_category_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=fake_category_logits,
         #                                                                            labels=true_labels))
         #category_loss = self.Lcategory_penalty * (real_category_loss + fake_category_loss)
@@ -398,8 +401,8 @@ class UNet(object):
 
         #d_loss = d_loss_real + d_loss_fake + category_loss / 2.0
 
-        q_z = distributions.Normal(loc=target_gaussian1[:, :self.latent_dim],
-                                   scale=tf.nn.softplus(target_gaussian1[:, self.latent_dim:]))
+        q_z = distributions.Normal(loc=target_gaussian1_shuffle[:, :self.latent_dim],
+                                   scale=tf.nn.softplus(target_gaussian1_shuffle[:, self.latent_dim:]))
 
 
 
@@ -419,9 +422,9 @@ class UNet(object):
         const_loss2 = 10.0*tf.reduce_mean(tf.square(layers_source_fake["e7"] - layers_source["e7"]),[1,2,3])
         const_loss3 = 5.0*tf.reduce_mean(tf.square(layers_source_fake["e6"] - layers_source["e6"]),[1,2,3])
         const_loss4 = tf.reduce_mean(tf.square(layers_source_fake["e5"] - layers_source["e5"]),[1,2,3])
-        const_loss=tf.reduce_sum(const_loss1+const_loss2+const_loss3+const_loss4)*self.Lconst_penalty
-        #const_loss=(tf.reduce_sum(const_loss1))*self.Lconst_penalty
-        T_loss =  tf.reduce_sum(l1_loss +kl_loss)
+        #const_loss=tf.reduce_sum(const_loss1+const_loss2+const_loss3+const_loss4)*self.Lconst_penalty
+        const_loss=(tf.reduce_sum(const_loss1))*self.Lconst_penalty
+        T_loss =  tf.reduce_sum(l1_loss +kl_loss+real_category_loss)
 
 
 
