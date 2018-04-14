@@ -28,8 +28,8 @@ SummaryHandle = namedtuple("SummaryHandle", ["T_sum"])
 
 class UNet(object):
     def __init__(self, experiment_dir=None, experiment_id=0, batch_size=16, input_width=256, output_width=256,
-                 generator_dim=64, generator_dim2=64,discriminator_dim=64, L1_penalty=100, Lconst_penalty=15, Ltv_penalty=0.0,
-                 Lcategory_penalty=1.0, embedding_num=40, embedding_dim=128, input_filters=3, output_filters=3,latent_dim=512):
+                 generator_dim=32, generator_dim2=64,discriminator_dim=64, L1_penalty=100, Lconst_penalty=15, Ltv_penalty=0.0,
+                 Lcategory_penalty=1.0, embedding_num=40, embedding_dim=128, input_filters=3, output_filters=3,latent_dim=256):
         self.experiment_dir = experiment_dir
         self.experiment_id = experiment_id
         self.batch_size = batch_size
@@ -350,13 +350,13 @@ class UNet(object):
 
         fake_target_shuffle, target_gaussian1_shuffle, target_gaussian2_shuffle, _, _ = self.generator(real_B,real_A_shuffle,  embedding_ids,is_training=is_training,inst_norm=inst_norm, reuse=tf.AUTO_REUSE)
 
-        real_A_shuffle2 = tf.random_shuffle(real_A)
+        real_A_shuffle2 = tf.random_shuffle(real_A_shuffle)
         fake_target_shuffle2, target_gaussian1_shuffle2, target_gaussian2_shuffle2, _,_ = self.generator(real_B,real_A_shuffle2,embedding_ids,is_training=is_training,inst_norm=inst_norm,reuse=tf.AUTO_REUSE)
 
-        real_A_shuffle3 = tf.random_shuffle(real_A)
+        real_A_shuffle3 = tf.random_shuffle(real_A_shuffle2)
         fake_target_shuffle3, target_gaussian1_shuffle3, target_gaussian2_shuffle3, _, _ = self.generator(real_B,real_A_shuffle3, embedding_ids,is_training=is_training,inst_norm=inst_norm,reuse=tf.AUTO_REUSE)
 
-        real_A_shuffle4 = tf.random_shuffle(real_A)
+        real_A_shuffle4 = tf.random_shuffle(real_A_shuffle3)
         fake_target_shuffle4, target_gaussian1_shuffle4, target_gaussian2_shuffle4, _, _ = self.generator(real_B,
                                                                                                           real_A_shuffle4,
                                                                                                           embedding_ids,
@@ -364,7 +364,7 @@ class UNet(object):
                                                                                                           inst_norm=inst_norm,
                                                                                                           reuse=tf.AUTO_REUSE)
 
-        real_A_shuffle5 = tf.random_shuffle(real_A)
+        real_A_shuffle5 = tf.random_shuffle(real_A_shuffle4)
         fake_target_shuffle5, target_gaussian1_shuffle5, target_gaussian2_shuffle5, _, _ = self.generator(real_B,
                                                                                                           real_A_shuffle5,
                                                                                                           embedding_ids,
@@ -438,6 +438,15 @@ class UNet(object):
         q_z = distributions.Normal(loc=target_gaussian1_shuffle[:, :self.latent_dim],
                                    scale=tf.nn.softplus(target_gaussian1_shuffle[:, self.latent_dim:]))
 
+        q_z2 = distributions.Normal(loc=target_gaussian1_shuffle2[:, :self.latent_dim],
+                                   scale=tf.nn.softplus(target_gaussian1_shuffle2[:, self.latent_dim:]))
+        q_z3 = distributions.Normal(loc=target_gaussian1_shuffle3[:, :self.latent_dim],
+                                   scale=tf.nn.softplus(target_gaussian1_shuffle3[:, self.latent_dim:]))
+        q_z4 = distributions.Normal(loc=target_gaussian1_shuffle4[:, :self.latent_dim],
+                                   scale=tf.nn.softplus(target_gaussian1_shuffle4[:, self.latent_dim:]))
+        q_z5 = distributions.Normal(loc=target_gaussian1_shuffle5[:, :self.latent_dim],
+                                   scale=tf.nn.softplus(target_gaussian1_shuffle5[:, self.latent_dim:]))
+
 
 
         # print(output.get_shape())
@@ -447,6 +456,10 @@ class UNet(object):
 
 
         kl_loss = tf.reduce_sum(distributions.kl_divergence(q_z, p_z), 1)
+        kl_loss2 = tf.reduce_sum(distributions.kl_divergence(q_z2, p_z), 1)
+        kl_loss3 = tf.reduce_sum(distributions.kl_divergence(q_z3, p_z), 1)
+        kl_loss4 = tf.reduce_sum(distributions.kl_divergence(q_z4, p_z), 1)
+        kl_loss5 = tf.reduce_sum(distributions.kl_divergence(q_z5, p_z), 1)
         kl_loss_1 = tf.reduce_sum(tf.reduce_sum(distributions.kl_divergence(q_z, p_z), 1))
 
 
@@ -459,10 +472,10 @@ class UNet(object):
         #const_loss=tf.reduce_sum(const_loss1+const_loss2+const_loss3+const_loss4)*self.Lconst_penalty
         const_loss=(tf.reduce_sum(const_loss1))*self.Lconst_penalty
         T_loss =  tf.reduce_sum(l1_loss +kl_loss)
-        T_loss2 = tf.reduce_sum(l1_loss2 + kl_loss)
-        T_loss3 = tf.reduce_sum(l1_loss3 + kl_loss)
-        T_loss4 = tf.reduce_sum(l1_loss4 + kl_loss)
-        T_loss5 = tf.reduce_sum(l1_loss5 + kl_loss)
+        T_loss2 = tf.reduce_sum(l1_loss2 + kl_loss2)
+        T_loss3 = tf.reduce_sum(l1_loss3 + kl_loss3)
+        T_loss4 = tf.reduce_sum(l1_loss4 + kl_loss4)
+        T_loss5 = tf.reduce_sum(l1_loss5 + kl_loss5)
 
 
 
@@ -477,10 +490,10 @@ class UNet(object):
         #const_loss_summary = tf.summary.scalar("const_loss", const_loss)
         #d_loss_summary = tf.summary.scalar("d_loss", d_loss)
         T_loss_summary = tf.summary.scalar("T_loss", T_loss)
-        T_loss2_summary = tf.summary.scalar("T_loss", T_loss2)
-        T_loss3_summary = tf.summary.scalar("T_loss", T_loss3)
-        T_loss4_summary = tf.summary.scalar("T_loss", T_loss4)
-        T_loss5_summary = tf.summary.scalar("T_loss", T_loss5)
+        T_loss2_summary = tf.summary.scalar("T_loss2", T_loss2)
+        T_loss3_summary = tf.summary.scalar("T_loss3", T_loss3)
+        T_loss4_summary = tf.summary.scalar("T_loss4", T_loss4)
+        T_loss5_summary = tf.summary.scalar("T_loss5", T_loss5)
         l1_loss_summary = tf.summary.scalar("l1_loss", tf.reduce_sum(l1_loss))
         l1_loss2_summary = tf.summary.scalar("l1_loss2", tf.reduce_sum(l1_loss2))
         kl_loss_summary = tf.summary.scalar("kl_loss", kl_loss_1)
