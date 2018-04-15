@@ -465,7 +465,7 @@ class UNet(object):
                                  target=real_A,
                                  source=real_B,
                                  embedding=embedding,
-                                 gaussian_params=target_gaussian1)
+                                 gaussian_params=target_gaussian1_shuffle)
 
         summary_handle = SummaryHandle(T_sum=All_merged_summary)
 
