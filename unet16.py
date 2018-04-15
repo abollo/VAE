@@ -22,7 +22,7 @@ distributions = tf.distributions
 # Used to save handles(important nodes in computation graph) for later evaluation
 LossHandle = namedtuple("LossHandle", ["l1_loss","kl_loss","T_loss"])
 InputHandle = namedtuple("InputHandle", ["real_data", "embedding_ids", "no_target_data", "no_target_ids"])
-EvalHandle = namedtuple("EvalHandle", ["encoder", "generator", "generator2","target", "source", "embedding","gaussian_params"])
+EvalHandle = namedtuple("EvalHandle", [ "generator2","target", "source", "embedding","gaussian_params"])
 SummaryHandle = namedtuple("SummaryHandle", ["T_sum"])
 
 
@@ -183,46 +183,29 @@ class UNet(object):
 
 
     def e_decoder(self,encoder,reuse=False):
-        with tf.variable_scope("generator"):
-            if reuse:
-                tf.get_variable_scope().reuse_variables()
 
-
-
-            q_mu = encoder[:, :self.latent_dim]
-            # The standard deviation must be positive. Parametrize with a softplus
-            q_sigma = tf.nn.softplus(encoder[:, self.latent_dim:])
-            q_z = distributions.Normal(loc=q_mu, scale=q_sigma)
-            q_z_sample = q_z.sample()
-            #print(q_z_sample.get_shape())
-            q_z_decode = tf.reshape(q_z_sample, [-1, 1, 1, self.latent_dim])
-            #q_z_decode2 = tf.nn.relu(q_z_decode)
-            # print(q_z_decode.get_shape())
-            return q_z_decode
+        q_mu = encoder[:, :self.latent_dim]
+        # The standard deviation must be positive. Parametrize with a softplus
+        q_sigma = tf.nn.softplus(encoder[:, self.latent_dim:])
+        q_z = distributions.Normal(loc=q_mu, scale=q_sigma)
+        q_z_sample = q_z.sample()
+        # print(q_z_sample.get_shape())
+        q_z_decode = tf.reshape(q_z_sample, [-1, 1, 1, self.latent_dim])
+        # q_z_decode2 = tf.nn.relu(q_z_decode)
+        # print(q_z_decode.get_shape())
+        return q_z_decode
 
 
 
 
 
-    def generator(self, images_source, images_target, embedding_ids, inst_norm, is_training, reuse=False):
-
-        e8, enc_layers = self.encoder(images_source, is_training=is_training, reuse=reuse)
-
-        e8_gaussion = self.gaussion_encoder(images_target, enc_layers, is_training=is_training, reuse=reuse)
-        e8_2 = self.e_decoder(e8_gaussion, reuse=reuse)
-        # local_embeddings = tf.nn.embedding_lookup(embeddings, ids=embedding_ids)
-        # local_embeddings = tf.reshape(local_embeddings, [self.batch_size, 1, 1, self.embedding_dim])
-        embedded = tf.concat([e8, e8_2], 3)
-        # print(e8.get_shape())
-        # print(embedded.get_shape().as_list())
-        output = self.decoder(embedded, enc_layers, embedding_ids, inst_norm, is_training=is_training, reuse=reuse)
-        return output, e8_gaussion, e8_2, e8, enc_layers
 
 
 
 
 
-    def generator_gaussian(self, enc_layers, images_target, embedding_ids, inst_norm, is_training, reuse=True):
+
+    def generator_gaussian(self, enc_layers, images_target, embedding_ids, inst_norm, is_training, reuse=False):
 
         e8_gaussion = self.gaussion_encoder(images_target, enc_layers, is_training=is_training, reuse=reuse)
         e8_2 = self.e_decoder(e8_gaussion, reuse=reuse)
@@ -277,9 +260,11 @@ class UNet(object):
         real_A_shuffle=tf.random_shuffle(real_A)
         embedding = init_embedding(self.embedding_num, self.embedding_dim)
 
-        fake_target, target_gaussian1,target_gaussian2,source_e8,layers_source = self.generator(real_B, real_A, embedding_ids, is_training=is_training,inst_norm=inst_norm, reuse=False)
+        #fake_target, target_gaussian1,target_gaussian2,source_e8,layers_source = self.generator(real_B, real_A, embedding_ids, is_training=is_training,inst_norm=inst_norm, reuse=False)
 
-        fake_target_shuffle, target_gaussian1_shuffle, target_gaussian2_shuffle= self.generator_gaussian(layers_source,real_A_shuffle,  embedding_ids,is_training=is_training,inst_norm=inst_norm, reuse=True)
+        source_e8, layers_source = self.encoder(real_B,is_training=is_training,reuse=False)
+
+        fake_target_shuffle, target_gaussian1_shuffle, target_gaussian2_shuffle= self.generator_gaussian(layers_source,real_A_shuffle,  embedding_ids,is_training=is_training,inst_norm=inst_norm, reuse=False)
 
 
 
@@ -413,8 +398,7 @@ class UNet(object):
                                  #cheat_loss=cheat_loss,
                                  )
 
-        eval_handle = EvalHandle(encoder=target_gaussian2,
-                                 generator=fake_target,
+        eval_handle = EvalHandle(
                                  generator2=fake_target_shuffle,
                                  target=real_A,
                                  source=real_B,
