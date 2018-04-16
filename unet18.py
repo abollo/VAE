@@ -265,13 +265,9 @@ class UNet(object):
         source_e8, layers_source = self.encoder(real_B,is_training=is_training,reuse=False)
 
 
-        fake_target_shuffle, target_gaussian1_shuffle, target_gaussian2_shuffle = self.generator_gaussian(layers_source,
-                                                                                                          real_A_shuffle,
-                                                                                                          embedding_ids,
-                                                                                                          is_training=is_training,
-                                                                                                          inst_norm=inst_norm,
-                                                                                                          reuse=False)
 
+        target_gaussian1_shuffle = self.gaussion_encoder(real_A_shuffle, layers_source, is_training=is_training,
+                                                         reuse=False)
 
         real_A_shuffle2=tf.random_shuffle(real_A_shuffle)
         target_gaussian2_shuffle = self.gaussion_encoder(real_A_shuffle2, layers_source, is_training=is_training,
@@ -291,9 +287,18 @@ class UNet(object):
         target_gaussian5_shuffle = self.gaussion_encoder(real_A_shuffle5, layers_source, is_training=is_training,
                                                          reuse=True)
 
-        a=tf.concat([target_gaussian1_shuffle,target_gaussian2_shuffle,target_gaussian3_shuffle,target_gaussian4_shuffle,target_gaussian5_shuffle],0)
-        print(a.get_shape())
-        print(target_gaussian1_shuffle.get_shape())
+        e8_gaussion_sum=tf.div(tf.add(tf.add(tf.add(tf.add(target_gaussian1_shuffle,target_gaussian2_shuffle),target_gaussian3_shuffle),target_gaussian4_shuffle),target_gaussian5_shuffle),5.0)
+
+        #print(e8_gaussion_sum.get_shape())
+        #print(target_gaussian1_shuffle.get_shape())
+
+        e8_2_sum = self.e_decoder(e8_gaussion_sum, reuse=False)
+        # local_embeddings = tf.nn.embedding_lookup(embeddings, ids=embedding_ids)
+        # local_embeddings = tf.reshape(local_embeddings, [self.batch_size, 1, 1, self.embedding_dim])
+        embedded_sum = tf.concat([layers_source["e8"], e8_2_sum], 3)
+        # print(e8.get_shape())
+        # print(embedded.get_shape().as_list())
+        fake_target_shuffle = self.decoder(embedded_sum, layers_source, embedding_ids, inst_norm, is_training=is_training, reuse=False)
 
 
 
