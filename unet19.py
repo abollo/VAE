@@ -358,8 +358,8 @@ class UNet(object):
 
         #d_loss = d_loss_real + d_loss_fake + category_loss / 2.0
 
-        q_z = distributions.Normal(loc=target_gaussian1_shuffle[:, :self.latent_dim],
-                                   scale=tf.nn.softplus(target_gaussian1_shuffle[:, self.latent_dim:]))
+        q_z = distributions.Normal(loc=e8_gaussion_sum[:, :self.latent_dim],
+                                   scale=tf.nn.softplus(e8_gaussion_sum[:, self.latent_dim:]))
 
 
 
