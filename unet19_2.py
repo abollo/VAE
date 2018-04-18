@@ -405,7 +405,7 @@ class UNet(object):
 
         const_loss=tf.reduce_sum(const_loss1+const_loss2+const_loss3+const_loss4+const_loss5+const_loss6+const_loss7+const_loss8)*self.Lconst_penalty
         #const_loss=(tf.reduce_sum(const_loss1))*self.Lconst_penalty
-        T_loss =  tf.reduce_sum(l1_loss +kl_loss+kl_loss_ss+l1_loss_ss)
+        T_loss =  tf.reduce_sum(l1_loss +kl_loss+kl_loss_ss+l1_loss_ss+const_loss)
 
 
 
