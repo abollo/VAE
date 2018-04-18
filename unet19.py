@@ -382,8 +382,8 @@ class UNet(object):
         const_loss3 = tf.reduce_mean(tf.abs(layers_source_fake["e6"] - layers_source["e6"]),[1,2,3])
         const_loss4 = tf.reduce_mean(tf.abs(layers_source_fake["e5"] - layers_source["e5"]),[1,2,3])
         #const_loss5 = tf.reduce_mean(tf.abs(layers_source_fake - layers_source), [1, 2, 3])
-        const_loss=tf.reduce_sum(const_loss1+const_loss2+const_loss3+const_loss4)*self.Lconst_penalty
-        #const_loss=(tf.reduce_sum(const_loss_all))*self.Lconst_penalty
+        #const_loss=tf.reduce_sum(const_loss1+const_loss2+const_loss3+const_loss4)*self.Lconst_penalty
+        const_loss=(tf.reduce_sum(const_loss1))*self.Lconst_penalty
         T_loss =  tf.reduce_sum(l1_loss +kl_loss+real_category_loss+const_loss)
 
 
@@ -706,7 +706,7 @@ class UNet(object):
             if (ei + 1) % schedule == 0:
                 update_lr = current_lr / 2.0
                 # minimum learning rate guarantee
-                update_lr = max(update_lr, 0.0002)
+                update_lr = max(update_lr, 0.00002)
                 print("decay learning rate from %.5f to %.5f" % (current_lr, update_lr))
                 current_lr = update_lr
 
