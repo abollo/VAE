@@ -52,9 +52,9 @@ class UNet(object):
         # experiment_dir is needed for training
         if experiment_dir:
             self.data_dir = os.path.join(self.experiment_dir, "data")
-            self.checkpoint_dir = os.path.join(self.experiment_dir, "checkpoint")
-            self.sample_dir = os.path.join(self.experiment_dir, "sample")
-            self.log_dir = os.path.join(self.experiment_dir, "logs")
+            self.checkpoint_dir = os.path.join(self.experiment_dir, "checkpoint_19")
+            self.sample_dir = os.path.join(self.experiment_dir, "sample_19")
+            self.log_dir = os.path.join(self.experiment_dir, "logs_19")
 
             if not os.path.exists(self.checkpoint_dir):
                 os.makedirs(self.checkpoint_dir)
