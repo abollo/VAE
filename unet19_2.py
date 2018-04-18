@@ -29,7 +29,7 @@ SummaryHandle = namedtuple("SummaryHandle", ["T_sum"])
 class UNet(object):
     def __init__(self, experiment_dir=None, experiment_id=0, batch_size=16, input_width=256, output_width=256,
                  generator_dim=32, generator_dim2=32,discriminator_dim=64, L1_penalty=100, Lconst_penalty=15, Ltv_penalty=0.0,
-                 Lcategory_penalty=1.0, embedding_num=40, embedding_dim=128, input_filters=3, output_filters=3,latent_dim=256):
+                 Lcategory_penalty=1.0, embedding_num=40, embedding_dim=128, input_filters=3, output_filters=3,latent_dim=1024):
         self.experiment_dir = experiment_dir
         self.experiment_id = experiment_id
         self.batch_size = batch_size
@@ -128,7 +128,7 @@ class UNet(object):
             e6 = encode_layer(e5, self.generator_dim * 8, 6)
             e7 = encode_layer(e6, self.generator_dim * 8, 7)
             e8 = encode_layer(e7, self.generator_dim * 8, 8)
-            #print(e1.get_shape(),e2.get_shape(),e3.get_shape(),e4.get_shape(),e5.get_shape(),e6.get_shape(),e7.get_shape(),e8.get_shape())
+            print(e1.get_shape(),e2.get_shape(),e3.get_shape(),e4.get_shape(),e5.get_shape(),e6.get_shape(),e7.get_shape(),e8.get_shape())
             return e8, encode_layers
 
 
@@ -263,6 +263,7 @@ class UNet(object):
         #fake_target, target_gaussian1,target_gaussian2,source_e8,layers_source = self.generator(real_B, real_A, embedding_ids, is_training=is_training,inst_norm=inst_norm, reuse=False)
 
         source_e8, layers_source = self.encoder(real_B,is_training=is_training,reuse=False)
+        target_e8, layers_target = self.encoder(real_A, is_training=is_training, reuse=True)
 
 
 
@@ -289,7 +290,7 @@ class UNet(object):
 
         e8_gaussion_sum=tf.div(tf.add(tf.add(tf.add(tf.add(target_gaussian1_shuffle,target_gaussian2_shuffle),target_gaussian3_shuffle),target_gaussian4_shuffle),target_gaussian5_shuffle),5.0)
 
-        source_gaussian1 = self.gaussion_encoder(real_B, layers_source, is_training=is_training,
+        source_gaussian1 = self.gaussion_encoder(real_B, layers_target, is_training=is_training,
                                                          reuse=True)
 
         #print(e8_gaussion_sum.get_shape())
@@ -301,12 +302,12 @@ class UNet(object):
         # local_embeddings = tf.reshape(local_embeddings, [self.batch_size, 1, 1, self.embedding_dim])
         embedded_sum = tf.concat([layers_source["e8"], e8_2_sum], 3)
 
-        embedded_sum_ss = tf.concat([layers_source["e8"], source_gaussian2], 3)
+        embedded_sum_ss = tf.concat([layers_target["e8"], source_gaussian2], 3)
         # print(e8.get_shape())
         # print(embedded.get_shape().as_list())
         fake_target_shuffle = self.decoder(embedded_sum, layers_source, embedding_ids, inst_norm, is_training=is_training, reuse=False)
 
-        fake_source = self.decoder(embedded_sum_ss, layers_source, embedding_ids, inst_norm,
+        fake_source = self.decoder(embedded_sum_ss, layers_target, embedding_ids, inst_norm,
                                            is_training=is_training, reuse=True)
 
 
@@ -393,14 +394,18 @@ class UNet(object):
 
         #const_loss = (tf.reduce_mean(tf.reduce_sum(tf.square(lay_AB["e1"] - lay_A["e1"]))+tf.reduce_sum(tf.square(lay_AB["e2"] - lay_A["e2"]))+tf.reduce_sum(tf.square(lay_AB["e3"] - lay_A["e3"]))+tf.reduce_sum(tf.square(lay_AB["e4"] - lay_A["e4"]))+tf.reduce_sum(tf.square(lay_AB["e5"] - lay_A["e5"]))+tf.reduce_sum(tf.square(lay_AB["e6"] - lay_A["e6"]))+tf.reduce_sum(tf.square(lay_AB["e7"] - lay_A["e7"])))) * self.Lconst_penalty
 
-        const_loss1 = tf.reduce_mean(tf.abs(layers_source_fake["e8"] - layers_source["e8"]),[1,2,3])
-        const_loss2 = tf.reduce_mean(tf.abs(layers_source_fake["e7"] - layers_source["e7"]),[1,2,3])
-        const_loss3 = tf.reduce_mean(tf.abs(layers_source_fake["e6"] - layers_source["e6"]),[1,2,3])
-        const_loss4 = tf.reduce_mean(tf.abs(layers_source_fake["e5"] - layers_source["e5"]),[1,2,3])
-        #const_loss5 = tf.reduce_mean(tf.abs(layers_source_fake - layers_source), [1, 2, 3])
-        #const_loss=tf.reduce_sum(const_loss1+const_loss2+const_loss3+const_loss4)*self.Lconst_penalty
-        const_loss=(tf.reduce_sum(const_loss1))*self.Lconst_penalty
-        T_loss =  tf.reduce_sum(l1_loss +kl_loss+real_category_loss+const_loss+kl_loss_ss+l1_loss_ss)
+        const_loss8 = tf.reduce_mean(tf.abs(layers_target["e8"] - layers_source["e8"]),[1,2,3])/256.0
+        const_loss7 = tf.reduce_mean(tf.abs(layers_target["e7"] - layers_source["e7"]),[1,2,3])/(2.0*2.0*256.0)
+        const_loss6 = tf.reduce_mean(tf.abs(layers_target["e6"] - layers_source["e6"]),[1,2,3])/(4.0*4.0*256.0)
+        const_loss5 = tf.reduce_mean(tf.abs(layers_target["e5"] - layers_source["e5"]),[1,2,3])/(8.0*8.0*256.0)
+        const_loss4 = tf.reduce_mean(tf.abs(layers_target["e4"] - layers_source["e4"]), [1, 2, 3])/(16.0*16.0*256.0)
+        const_loss3 = tf.reduce_mean(tf.abs(layers_target["e3"] - layers_source["e3"]), [1, 2, 3])/(32.0*32.0*128.0)
+        const_loss2 = tf.reduce_mean(tf.abs(layers_target["e2"] - layers_source["e2"]), [1, 2, 3])/(64.0*64.0*64.0)
+        const_loss1 = tf.reduce_mean(tf.abs(layers_target["e1"] - layers_source["e1"]), [1, 2, 3])/(128.0*128.0*32)
+
+        const_loss=tf.reduce_sum(const_loss1+const_loss2+const_loss3+const_loss4+const_loss5+const_loss6+const_loss7+const_loss8)*self.Lconst_penalty
+        #const_loss=(tf.reduce_sum(const_loss1))*self.Lconst_penalty
+        T_loss =  tf.reduce_sum(l1_loss +kl_loss+kl_loss_ss+l1_loss_ss)
 
 
 
@@ -726,7 +731,7 @@ class UNet(object):
             if (ei + 1) % schedule == 0:
                 update_lr = current_lr / 2.0
                 # minimum learning rate guarantee
-                update_lr = max(update_lr, 0.00002)
+                update_lr = max(update_lr, 0.000002)
                 print("decay learning rate from %.5f to %.5f" % (current_lr, update_lr))
                 current_lr = update_lr
 
@@ -737,13 +742,17 @@ class UNet(object):
                 if flip_labels:
                     np.random.shuffle(shuffled_ids)
 
-                _, l1_loss_run, kl_loss_run, T_loss_run,T_sum_run,gaussian_params= self.sess.run([all_optimizer,loss_handle.l1_loss, loss_handle.kl_loss,loss_handle.T_loss,summary_handle.T_sum,eval_handle.gaussian_params],feed_dict={
-                                                               real_data: batch_images,
-                                                               embedding_ids: labels,
-                                                               learning_rate: current_lr,
-                                                               no_target_data: batch_images,
-                                                               no_target_ids: shuffled_ids
-                                                           })
+
+
+                _, l1_loss_run, kl_loss_run, T_loss_run, T_sum_run, gaussian_params = self.sess.run(
+                    [all_optimizer, loss_handle.l1_loss, loss_handle.kl_loss, loss_handle.T_loss, summary_handle.T_sum,
+                     eval_handle.gaussian_params], feed_dict={
+                        real_data: batch_images,
+                        embedding_ids: labels,
+                        learning_rate: current_lr,
+                        no_target_data: batch_images,
+                        no_target_ids: shuffled_ids
+                    })
 
 
 
