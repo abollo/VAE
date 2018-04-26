@@ -28,7 +28,7 @@ SummaryHandle = namedtuple("SummaryHandle", ["T_sum"])
 
 class UNet(object):
     def __init__(self, experiment_dir=None, experiment_id=0, batch_size=16, input_width=256, output_width=256,
-                 generator_dim=32, generator_dim2=32,discriminator_dim=64, L1_penalty=100, Lconst_penalty=15, Ltv_penalty=0.0,
+                 generator_dim=64, generator_dim2=64,discriminator_dim=64, L1_penalty=100, Lconst_penalty=15, Ltv_penalty=0.0,
                  Lcategory_penalty=1.0, embedding_num=40, embedding_dim=128, input_filters=3, output_filters=3,latent_dim=256):
         self.experiment_dir = experiment_dir
         self.experiment_id = experiment_id
@@ -51,10 +51,10 @@ class UNet(object):
         self.sess = None
         # experiment_dir is needed for training
         if experiment_dir:
-            self.data_dir = os.path.join(self.experiment_dir, "data")
-            self.checkpoint_dir = os.path.join(self.experiment_dir, "checkpoint")
-            self.sample_dir = os.path.join(self.experiment_dir, "sample")
-            self.log_dir = os.path.join(self.experiment_dir, "logs")
+            self.data_dir = os.path.join(self.experiment_dir, "data_18")
+            self.checkpoint_dir = os.path.join(self.experiment_dir, "checkpoint_18")
+            self.sample_dir = os.path.join(self.experiment_dir, "sample_18")
+            self.log_dir = os.path.join(self.experiment_dir, "logs_18")
 
             if not os.path.exists(self.checkpoint_dir):
                 os.makedirs(self.checkpoint_dir)
@@ -167,9 +167,9 @@ class UNet(object):
                 return dec
 
             d1 = decode_layer(encoded, s128, self.generator_dim * 8, layer=1, enc_layer=encoding_layers["e7"],
-                              dropout=True)
-            d2 = decode_layer(d1, s64, self.generator_dim * 8, layer=2, enc_layer=encoding_layers["e6"], dropout=True)
-            d3 = decode_layer(d2, s32, self.generator_dim * 8, layer=3, enc_layer=encoding_layers["e5"], dropout=True)
+                              dropout=False)
+            d2 = decode_layer(d1, s64, self.generator_dim * 8, layer=2, enc_layer=encoding_layers["e6"], dropout=False)
+            d3 = decode_layer(d2, s32, self.generator_dim * 8, layer=3, enc_layer=encoding_layers["e5"], dropout=False)
             d4 = decode_layer(d3, s16, self.generator_dim * 8, layer=4, enc_layer=encoding_layers["e4"])
             d5 = decode_layer(d4, s8, self.generator_dim * 4, layer=5, enc_layer=encoding_layers["e3"])
             d6 = decode_layer(d5, s4, self.generator_dim * 2, layer=6, enc_layer=encoding_layers["e2"])
@@ -263,6 +263,7 @@ class UNet(object):
         #fake_target, target_gaussian1,target_gaussian2,source_e8,layers_source = self.generator(real_B, real_A, embedding_ids, is_training=is_training,inst_norm=inst_norm, reuse=False)
 
         source_e8, layers_source = self.encoder(real_B,is_training=is_training,reuse=False)
+        target_e8, layers_target = self.encoder(real_A, is_training=is_training, reuse=True)
 
 
 
@@ -299,6 +300,7 @@ class UNet(object):
         # print(e8.get_shape())
         # print(embedded.get_shape().as_list())
         fake_target_shuffle = self.decoder(embedded_sum, layers_source, embedding_ids, inst_norm, is_training=is_training, reuse=False)
+
 
 
 
@@ -358,8 +360,8 @@ class UNet(object):
 
         #d_loss = d_loss_real + d_loss_fake + category_loss / 2.0
 
-        q_z = distributions.Normal(loc=target_gaussian1_shuffle[:, :self.latent_dim],
-                                   scale=tf.nn.softplus(target_gaussian1_shuffle[:, self.latent_dim:]))
+        q_z = distributions.Normal(loc=e8_gaussion_sum[:, :self.latent_dim],
+                                   scale=tf.nn.softplus(e8_gaussion_sum[:, self.latent_dim:]))
 
 
 
@@ -377,13 +379,29 @@ class UNet(object):
 
         #const_loss = (tf.reduce_mean(tf.reduce_sum(tf.square(lay_AB["e1"] - lay_A["e1"]))+tf.reduce_sum(tf.square(lay_AB["e2"] - lay_A["e2"]))+tf.reduce_sum(tf.square(lay_AB["e3"] - lay_A["e3"]))+tf.reduce_sum(tf.square(lay_AB["e4"] - lay_A["e4"]))+tf.reduce_sum(tf.square(lay_AB["e5"] - lay_A["e5"]))+tf.reduce_sum(tf.square(lay_AB["e6"] - lay_A["e6"]))+tf.reduce_sum(tf.square(lay_AB["e7"] - lay_A["e7"])))) * self.Lconst_penalty
 
-        const_loss1 = tf.reduce_mean(tf.square(layers_source_fake["e8"] - layers_source["e8"]),[1,2,3])
-        const_loss2 = 10.0*tf.reduce_mean(tf.square(layers_source_fake["e7"] - layers_source["e7"]),[1,2,3])
-        const_loss3 = 5.0*tf.reduce_mean(tf.square(layers_source_fake["e6"] - layers_source["e6"]),[1,2,3])
-        const_loss4 = tf.reduce_mean(tf.square(layers_source_fake["e5"] - layers_source["e5"]),[1,2,3])
-        const_loss=tf.reduce_sum(const_loss1+const_loss2+const_loss3+const_loss4)*self.Lconst_penalty
-        const_loss=(tf.reduce_sum(const_loss1))*self.Lconst_penalty
-        T_loss =  tf.reduce_sum(l1_loss +kl_loss)
+        const_loss8 = tf.reduce_mean(tf.square(layers_target["e8"] - layers_source["e8"]), [1, 2, 3]) / 256.0
+        const_loss7 = tf.reduce_mean(tf.square(layers_target["e7"] - layers_source["e7"]), [1, 2, 3]) / (2.0 * 2.0 * 256.0)
+        const_loss6 = tf.reduce_mean(tf.square(layers_target["e6"] - layers_source["e6"]), [1, 2, 3]) / (4.0 * 4.0 * 256.0)
+        const_loss5 = tf.reduce_mean(tf.square(layers_target["e5"] - layers_source["e5"]), [1, 2, 3]) / (8.0 * 8.0 * 256.0)
+        const_loss4 = tf.reduce_mean(tf.square(layers_target["e4"] - layers_source["e4"]), [1, 2, 3]) / (
+                    16.0 * 16.0 * 256.0)
+        const_loss3 = tf.reduce_mean(tf.square(layers_target["e3"] - layers_source["e3"]), [1, 2, 3]) / (
+                    32.0 * 32.0 * 128.0)
+        const_loss2 = tf.reduce_mean(tf.square(layers_target["e2"] - layers_source["e2"]), [1, 2, 3]) / (
+                    64.0 * 64.0 * 64.0)
+        const_loss1 = tf.reduce_mean(tf.square(layers_target["e1"] - layers_source["e1"]), [1, 2, 3]) / (
+                    128.0 * 128.0 * 32)
+
+        const_loss = tf.reduce_sum(
+            const_loss1 + const_loss2 + const_loss3 + const_loss4 + const_loss5 + const_loss6 + const_loss7 + const_loss8) * self.Lconst_penalty
+
+        #const_loss1 = tf.reduce_mean(tf.square(layers_source_fake["e8"] - layers_source["e8"]),[1,2,3])
+        #const_loss2 = 10.0*tf.reduce_mean(tf.square(layers_source_fake["e7"] - layers_source["e7"]),[1,2,3])
+        #const_loss3 = 5.0*tf.reduce_mean(tf.square(layers_source_fake["e6"] - layers_source["e6"]),[1,2,3])
+        #const_loss4 = tf.reduce_mean(tf.square(layers_source_fake["e5"] - layers_source["e5"]),[1,2,3])
+        #const_loss=tf.reduce_sum(const_loss1+const_loss2+const_loss3+const_loss4)*self.Lconst_penalty
+        #const_loss=(tf.reduce_sum(const_loss1))*self.Lconst_pe
+        T_loss =  tf.reduce_mean(tf.reduce_sum(l1_loss +kl_loss+const_loss))
 
 
 
@@ -691,6 +709,7 @@ class UNet(object):
         if resume:
             _, model_dir = self.get_model_id_and_dir()
             self.restore_model(saver, model_dir)
+            print("restore model")
 
         current_lr = lr
         counter = 0
